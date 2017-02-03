@@ -16,14 +16,35 @@ import getpass
 import os.path
 import sys
 import threading
+import re
 from datetime import date
 from time import sleep
 
 WAIT_TIME = 2
 
+# Delay new threads by this number of seconds to reduce load on the auth server
+THREAD_PERIOD = 3
+
+def read_tag_block(filename, tag, add_newline = False):
+    values = []
+    with open(filename) as f:
+        lines = list(csv.reader(f))
+        for line in lines:
+            the_line = line[0]
+            if the_line.startswith(tag):               
+                value = the_line.split(':')[1]
+                 # Handle the case where a command is just 'enter'
+                if (len(value) == 1): values.append('\n')
+                else:
+                    if add_newline:
+                        values.append(value + '\n')
+                    else:
+                        values.append(value)
+        return values
+        
 def read_commands(filename):
     commands = []
-    with open(sa[1]) as f:
+    with open(filename) as f:
         lines = list(csv.reader(f))
         for line in lines:
             the_line = line[0]
@@ -45,17 +66,18 @@ def read_ips(filename):
     return ips
 
 class myThread (threading.Thread):
-    def __init__(self, ip, commands, log):
+    def __init__(self, ip, commands, regex, log):
         threading.Thread.__init__(self)
         self.ip = ip
         self.commands = commands
+        self.regex = regex
         self.log = log
     def run(self):
         print ("Starting " + self.ip)
-        run_script(self.ip, self.commands, self.log)
+        run_script(self.ip, self.commands, self.regex, self.log)
         print ("Exiting " + self.ip)
 
-def run_script(ip, commands, log):
+def run_script(ip, commands, regex, log):
      # setup the connection
     log_string = ""
     log_string = log_string + "\r\nConnecting to " + ip + "\r\n"
@@ -81,9 +103,16 @@ def run_script(ip, commands, log):
         sleep(WAIT_TIME)
         receive = shell_channel.recv(10000)
         log_string = log_string + receive.decode()
- 
-    # Write the output to the log       
-    log.write(log_string.encode())
+    print("Applying regex",regex)
+    parse = re.search(regex, log_string)
+    if parse != None:
+        print("Found",str(parse.group(0)))
+        # Write the output to the log
+        log.write(str('Output for ' + ip + ',').encode())       
+        log.write(str(parse.group(0)).encode())
+        log.write(str("\r\n").encode())
+    else:
+        log.write(str('Output for ' + ip + ',None\r\n').encode())
     # Close the connection when done
     print("Closing connection to " + ip)
     client.close()
@@ -94,14 +123,15 @@ def run_script(ip, commands, log):
 
 sa = sys.argv
 lsa = len(sys.argv)
-if lsa != 3:
-    print ("Usage: [ python ] nora2.py script_file_name username")
-    print ("Example: [ python ] nora2.py script_file_name.txt stephen.redlack")
+print("Found",lsa,"args")
+for i in sa: print(i)
+if lsa != 2:
+    print ("Usage: [ python ] SSH-multi-runner.py script_file_name")
+    print ("Example: [ python ] SSH-multi-runner.py script_file_name.txt")
     sa.append(input("Filename: "))
-    sa.append(input("Username: "))
 
 os.chdir(os.path.dirname(sa[1]))
-username = sa[2]
+username = read_tag_block(sa[1],'username:')[0]
 password = getpass.getpass(prompt="Password: ")
 
 # Double-check the password to prevent fat finger errors
@@ -115,21 +145,26 @@ log = open(log_path, 'ab')
 log.write('\r\n'.encode())
 
 # Setup the command list
-commands = read_commands(sa[1])
+commands = read_tag_block(sa[1],'command:', add_newline = True)
 print(commands)
 
 # Setup the ip list
-ips = read_ips(sa[1])
+ips = read_tag_block(sa[1],'target:')
 print(ips)
+
+# Setup the regex
+regex = read_tag_block(sa[1],'regex:')[0]
+print(regex)
 
 # Build the threads
 threadList = []    
 for ip in ips:
-    threadList.append(myThread(ip, commands, log))
+    threadList.append(myThread(ip, commands, regex, log))
 
 # Run the threads
 for t in threadList:
     t.start()
+    sleep(THREAD_PERIOD)
     
 # Wait for all threads to finish
 for t in threadList:
@@ -138,4 +173,5 @@ for t in threadList:
 # Close the log when all done
 log.close() 
 
-input("All done. Press enter to exit.")
+print("Completed. Exiting.")
+

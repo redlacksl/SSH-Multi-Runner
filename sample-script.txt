@@ -1,6 +1,8 @@
-target:10.20.30.40
-target:10.20.30.41
-target:10.30.40.123
+username:myusername
+target:192.168.10.1
+target:192.168.10.20
+target:192.168.240.50
 command:terminal length 0
-command:show inventory
+command:show version
 command:exit
+regex:Processor board ID [A-Z|0-9]{11}
