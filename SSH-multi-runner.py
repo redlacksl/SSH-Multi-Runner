@@ -104,6 +104,7 @@ def run_script(ip, commands, regex, log):
         receive = shell_channel.recv(10000)
         log_string = log_string + receive.decode()
     print("Applying regex",regex)
+    # If there is no regex, then save the whole output
     if not regex:
         log.write(log_string.encode())
     else:
