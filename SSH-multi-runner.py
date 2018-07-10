@@ -104,15 +104,18 @@ def run_script(ip, commands, regex, log):
         receive = shell_channel.recv(10000)
         log_string = log_string + receive.decode()
     print("Applying regex",regex)
-    parse = re.search(regex, log_string)
-    if parse != None:
-        print("Found",str(parse.group(0)))
-        # Write the output to the log
-        log.write(str('Output for ' + ip + ',').encode())       
-        log.write(str(parse.group(0)).encode())
-        log.write(str("\r\n").encode())
+    if not regex:
+        log.write(log_string.encode())
     else:
-        log.write(str('Output for ' + ip + ',None\r\n').encode())
+        parse = re.search(regex, log_string)
+        if parse != None:
+            print("Found",str(parse.group(0)))
+            # Write the output to the log
+            log.write(str('Output for ' + ip + ',').encode())       
+            log.write(str(parse.group(0)).encode())
+            log.write(str("\r\n").encode())
+        else:
+            log.write(str('Output for ' + ip + ',None\r\n').encode())
     # Close the connection when done
     print("Closing connection to " + ip)
     client.close()
