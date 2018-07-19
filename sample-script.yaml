@@ -1,0 +1,10 @@
+username: myusername
+targets: 
+- 192.168.10.1
+- 192.168.10.20
+- 192.168.240.50
+commands: 
+- terminal length 0
+- show version
+- exit
+regex: Processor board ID [A-Z|0-9]{11}

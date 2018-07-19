@@ -1,8 +1,0 @@
-username:myusername
-target:192.168.10.1
-target:192.168.10.20
-target:192.168.240.50
-command:terminal length 0
-command:show version
-command:exit
-regex:Processor board ID [A-Z|0-9]{11}

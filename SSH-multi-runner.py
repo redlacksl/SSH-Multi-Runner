@@ -10,13 +10,13 @@ http://docs.paramiko.org/en/1.16/index.html
 
 """
 
-import csv
 import paramiko
 import getpass
 import os.path
 import sys
 import threading
 import re
+import yaml
 from datetime import date
 from time import sleep
 
@@ -24,46 +24,6 @@ WAIT_TIME = 2
 
 # Delay new threads by this number of seconds to reduce load on the auth server
 THREAD_PERIOD = 3
-
-def read_tag_block(filename, tag, add_newline = False):
-    values = []
-    with open(filename) as f:
-        lines = list(csv.reader(f))
-        for line in lines:
-            the_line = line[0]
-            if the_line.startswith(tag):               
-                value = the_line.split(':')[1]
-                 # Handle the case where a command is just 'enter'
-                if (len(value) == 1): values.append('\n')
-                else:
-                    if add_newline:
-                        values.append(value + '\n')
-                    else:
-                        values.append(value)
-        return values
-        
-def read_commands(filename):
-    commands = []
-    with open(filename) as f:
-        lines = list(csv.reader(f))
-        for line in lines:
-            the_line = line[0]
-            if the_line.startswith("command:"):               
-                command = the_line.split(':')[1]
-                 # Handle the case where a command is just 'enter'
-                if (len(command) == 1): commands.append('\n')
-                else: commands.append(command + '\n')
-        return commands
-            
-def read_ips(filename):
-    ips = []
-    with open(filename) as ip_list:
-        lines = list(csv.reader(ip_list))
-        for line in lines:
-            the_line = line[0]
-            if the_line.startswith("target:"):
-                ips.append(the_line.split(':')[1])
-    return ips
 
 class myThread (threading.Thread):
     def __init__(self, ip, commands, regex, log):
@@ -135,7 +95,11 @@ if lsa != 2:
     sa.append(input("Filename: "))
 
 os.chdir(os.path.dirname(sa[1]))
-username = read_tag_block(sa[1],'username:')[0]
+with open(sa[1]) as f:
+    script = yaml.load(f)
+print(script)
+
+username = script['username']
 password = getpass.getpass(prompt="Password: ")
 
 # Double-check the password to prevent fat finger errors
@@ -149,21 +113,18 @@ log = open(log_path, 'ab')
 log.write('\r\n'.encode())
 
 # Setup the command list
-commands = read_tag_block(sa[1],'command:', add_newline = True)
-print(commands)
+print('Commands are:', script['commands'])
 
 # Setup the ip list
-ips = read_tag_block(sa[1],'target:')
-print(ips)
+print('IPs are:', script['targets'])
 
 # Setup the regex
-regex = read_tag_block(sa[1],'regex:')[0]
-print(regex)
+print('Regex is:', script['regex'])
 
 # Build the threads
 threadList = []    
-for ip in ips:
-    threadList.append(myThread(ip, commands, regex, log))
+for ip in script['targets']:
+    threadList.append(myThread(ip, script['commands'], script['regex'], log))
 
 # Run the threads
 for t in threadList:
